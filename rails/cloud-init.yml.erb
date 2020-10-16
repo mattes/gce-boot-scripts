@@ -1,0 +1,83 @@
+#cloud-config
+
+bootcmd:
+  - mkdir -p /mnt/disks/helpers/bin
+  - mount -t tmpfs tmpfs /mnt/disks/helpers/bin
+
+write_files:
+  - path: /etc/profile.d/helpers.sh
+    content: export PATH="/mnt/disks/helpers/bin:$PATH"
+
+  - path: /etc/profile.d/home.sh
+    content: export HOME=/home
+
+  - path: /etc/profile.d/lc_all.sh
+    content: export LC_ALL=C
+
+  # simulate docker-credential-gcr configure-docker
+  - path: /home/.docker/config.json
+    permissions: '0755'
+    content: |
+      { "auths": {}, "credHelpers": { "asia.gcr.io": "gcr", "eu.gcr.io": "gcr", "gcr.io": "gcr", "marketplace.gcr.io": "gcr", "us.gcr.io": "gcr" } }
+
+  - path: /mnt/disks/helpers/bin/project_id
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id
+
+  - path: /mnt/disks/helpers/bin/access_token
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | cut -d'"' -f 4
+
+  - path: /mnt/disks/helpers/bin/fetch_secret
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      data=$(curl -s "https://secretmanager.googleapis.com/v1/projects/$(project_id)/secrets/$1/versions/latest:access" \
+        -H "Authorization: Bearer $(access_token)" -H "Content-Type: application/json" | jq -r '.payload.data')
+      decoded=$(echo "$data" | base64 -d)
+      if [[ $? == 0 ]]; then echo "$decoded"; else echo "$data"; fi
+  
+  - path: /var/log/rails-cmd.log
+    permissions: '0666'
+
+  - path: /mnt/disks/helpers/bin/rails
+    permissions: '0755'
+    content: |
+      <%= File.read("rails.sh").split("\n").join("\n      ") %>
+
+  - path: /mnt/disks/helpers/bin/console
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      rails --interactive --service console --run "rails console"
+
+runcmd:
+  - export HOME=/home
+  - export PATH="/mnt/disks/helpers/bin:$PATH"
+  - mkdir -p /var/run/pids && chmod a+w /var/run/pids
+
+  - wget -q -O /mnt/disks/helpers/bin/graceful-shutdown https://github.com/mattes/gce-graceful-shutdown/releases/download/v1.0.0/gce-graceful-shutdown.linux.amd64 
+  - chmod +x /mnt/disks/helpers/bin/graceful-shutdown
+
+  - wget -q -O /mnt/disks/helpers/bin/healthcheck https://github.com/mattes/healthcheck-cmd/releases/download/v1.0.0/healthcheck-cmd.linux.amd64
+  - chmod +x /mnt/disks/helpers/bin/healthcheck
+
+  - wget -q -O /mnt/disks/helpers/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+  - chmod +x /mnt/disks/helpers/bin/jq
+
+  - export CLOUDSQL_PROXY_VERSION=1.18.0
+  - until docker pull gcr.io/cloudsql-docker/gce-proxy:$CLOUDSQL_PROXY_VERSION; do sleep 3; done
+  - >
+    docker run -d --name cloudsql-proxy -p 127.0.0.1:5432:5432 --restart on-failure
+    gcr.io/cloudsql-docker/gce-proxy:$CLOUDSQL_PROXY_VERSION /cloud_sql_proxy
+    -instances=${{CLOUDSQL_INSTANCE}}=tcp:0.0.0.0:5432
+
+  # docker pull with retries
+  - until docker pull "${{DOCKER_IMAGE}}"; do sleep 3; done
+
+  - ${{RUN}}
+
