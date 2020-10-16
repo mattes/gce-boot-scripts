@@ -74,7 +74,7 @@ runcmd:
   - >
     docker run -d --name cloudsql-proxy -p 127.0.0.1:5432:5432 --restart on-failure
     gcr.io/cloudsql-docker/gce-proxy:$CLOUDSQL_PROXY_VERSION /cloud_sql_proxy
-    -instances=${{CLOUDSQL_INSTANCE}}=tcp:0.0.0.0:5432
+    -instances=$(fetch_secret '${{SECRETS_PREFIX}}_CLOUDSQL_INSTANCE')=tcp:0.0.0.0:5432
 
   # docker pull with retries
   - until docker pull "${{DOCKER_IMAGE}}"; do sleep 3; done

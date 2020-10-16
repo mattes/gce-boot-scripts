@@ -10,7 +10,7 @@ See also, [My own Heroku in 30 mins - Deploy Rails apps to Google Cloud Compute 
 * Search and replace the following variables:
   * `${{DOCKER_IMAGE}}`
   * `${{SECRETS_PREFIX}}`
-  * `${{CLOUDSQL_INSTANCE}}`
+* Create Google Secret `<SECRETS_PREFIX>_CLOUDSQL_INSTANCE` with connection string value like `my-project:region:my-sql-instance`.
 
 ## Helpers
 
