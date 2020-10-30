@@ -60,7 +60,7 @@ runcmd:
   - export PATH="/mnt/disks/helpers/bin:$PATH"
   - mkdir -p /var/run/pids && chmod a+w /var/run/pids
 
-  - wget -q -O /mnt/disks/helpers/bin/graceful-shutdown https://github.com/mattes/gce-graceful-shutdown/releases/download/v1.0.0/gce-graceful-shutdown.linux.amd64 
+  - wget -q -O /mnt/disks/helpers/bin/graceful-shutdown https://github.com/mattes/gce-graceful-shutdown/releases/download/v1.0.1/gce-graceful-shutdown.linux.amd64 
   - chmod +x /mnt/disks/helpers/bin/graceful-shutdown
 
   - wget -q -O /mnt/disks/helpers/bin/healthcheck https://github.com/mattes/healthcheck-cmd/releases/download/v1.0.0/healthcheck-cmd.linux.amd64
